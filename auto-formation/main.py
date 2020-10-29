@@ -115,13 +115,17 @@ def prepare_formation(tactic, players):
 
     formation = sorted(formation, key=lambda x: int(x[0].replace("p", "")))
     # fill the subs
-    for i in range(12, 22):
+    # get the sub gk first
+    gk = [s for s in subs if s["type"] == PLAYER_TYPE_GOAL_KEEPER][0]
+    formation.append(("p12", gk["uid"]))
+    for i in range(13, 22):
         try:
             formation.append((f"p{i}", subs.pop()["uid"]))
         except IndexError:
             pass
 
     formation = OrderedDict(formation)
+    print(formation)
     return formation
 
 
