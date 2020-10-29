@@ -137,7 +137,7 @@ def main():
         lineup_key = 'lineup1'
         if next_match["team_user_2"] == account["username"]:
             lineup_key = 'lineup2'
-        if next_match[lineup_key] != 0:
+        if next_match[lineup_key] == 0:
             # we need to set formation for that
             print(" > No formation is saved for that match. Let's build one.")
             players = get_available_players(r, account["username"])
