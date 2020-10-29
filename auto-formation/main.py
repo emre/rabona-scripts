@@ -6,28 +6,18 @@ from lighthive.client import Client
 from datetime import datetime
 from collections import OrderedDict
 
+from config import ACCOUNTS
+
 # possible train types
 # 433, 442, 352, 451, 4231, shot,dribbling, passing, defending,
 # headball, speed, endurance.
 
 
-ACCOUNTS = [
-    {
-        "username": "emrebeyler",
-        "formation": "433",
-        "posting_key": "<posting_key>"
-    },
-    {
-        "username": "klopp",
-        "formation": "4231",
-        "posting_key": "<posting_key>"
-    }
-]
-
 PLAYER_TYPE_GOAL_KEEPER = "1"
 PLAYER_TYPE_DEFENDER = "2"
 PLAYER_TYPE_MIDFIELDER = "3"
 PLAYER_TYPE_ATTACKER = "4"
+
 
 LOOKUP_PER_TACTIC = {
     "451": {
@@ -46,8 +36,15 @@ LOOKUP_PER_TACTIC = {
         PLAYER_TYPE_GOAL_KEEPER: ["p1"],
         PLAYER_TYPE_DEFENDER: ["p5", "p4", "p3", "p2"],
         PLAYER_TYPE_MIDFIELDER: ["p8", "p6", "p11", "p10", "p7"],
-        PLAYER_TYPE_ATTACKER: ["9"],
+        PLAYER_TYPE_ATTACKER: ["p9"],
+    },
+    "442": {
+        PLAYER_TYPE_GOAL_KEEPER: ["p1"],
+        PLAYER_TYPE_DEFENDER: ["p5", "p4", "p3", "p2", "p6"],
+        PLAYER_TYPE_MIDFIELDER: ["p7", "p8", "p10",],
+        PLAYER_TYPE_ATTACKER: ["p11", "p9"],
     }
+    # todo add other tactics
 }
 
 PLAYER_TYPE_MAP = {
@@ -99,6 +96,13 @@ def get_available_players(r, username):
     return players
 
 
+def get_formation(r, user, match_id):
+    lineup = r.lineup(user=user, match_id=match_id)
+    if isinstance(lineup, list):
+        return None
+    return lineup.get("formation")
+
+
 def prepare_formation(tactic, players):
     formation = []
     subs = []
@@ -125,7 +129,6 @@ def prepare_formation(tactic, players):
             pass
 
     formation = OrderedDict(formation)
-    print(formation)
     return formation
 
 
@@ -133,17 +136,29 @@ def main():
     import logging
     r = RabonaClient(loglevel=logging.ERROR)
     for account in ACCOUNTS:
+        print(f" > Analyzing next match for @{account['username']}.")
         next_match = get_next_match(r, account["username"])
         print(f" > Next match is {next_match['club_1']} "
-              f"vs {next_match['club_2']}")
+              f"vs {next_match['club_2']}.")
 
-        # check if there is a line-up already?
-        lineup_key = 'lineup1'
+        opponent_user = next_match["team_user_2"]
         if next_match["team_user_2"] == account["username"]:
-            lineup_key = 'lineup2'
-        if next_match[lineup_key] == 0:
+            opponent_user = next_match["team_user_1"]
+
+        formation_of_opponent = get_formation(
+            r, opponent_user, next_match["match_id"]) or "433 default"
+        print(f" > Opponent is @{opponent_user}.")
+        if formation_of_opponent:
+            print(f" > Opponent will play {formation_of_opponent}.")
+
+        formation_of_us = get_formation(
+            r, account["username"], next_match["match_id"]
+        )
+        if formation_of_us and str(formation_of_us) == account["formation"]:
+            print(f" > Formation is already set for this match: "
+                  f"{formation_of_us}.")
+        else:
             # we need to set formation for that
-            print(" > No formation is saved for that match. Let's build one.")
             players = get_available_players(r, account["username"])
             formation = prepare_formation(account["formation"], players)
 
@@ -158,8 +173,8 @@ def main():
             c.broadcast(op=op)
             print(f" >>> Formation: {account['formation']} is set"
                   f" for {account['username']}.")
-        else:
-            print(" > Line up is already decided. Good luck!")
+        print(f" > All operations are completed for {account['username']}.")
+        print("=" * 64)
 
 
 if __name__ == '__main__':
