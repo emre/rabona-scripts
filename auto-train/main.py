@@ -10,18 +10,8 @@ from datetime import datetime
 # headball, speed, endurance.
 
 
-ACCOUNTS = [
-    {
-        "username": "emrebeyler",
-        "auto_train_type": "433",
-        "posting_key": "<posting_key>>"
-    },
-    {
-        "username": "klopp",
-        "auto_train_type": "4231",
-        "posting_key": "<posting_key>>"
-    },
-]
+
+from config import ACCOUNTS
 
 
 def create_custom_json_op(username, auto_train_type):
@@ -46,6 +36,7 @@ def main():
     for account in ACCOUNTS:
         # check if we can train, first.
         userinfo = r.userinfo(user=account["username"])
+        userinfo["training_possible"] = True
         if not userinfo.get("training_possible"):
             # training is not possible, wait.
             dt_delta = datetime.fromtimestamp(
