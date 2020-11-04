@@ -1,3 +1,5 @@
+# -*- coding: UTF-8 -*-
+
 import json
 import datetime
 from rabona_python import RabonaClient
@@ -110,9 +112,12 @@ def prepare_formation(tactic, players):
         target_group = [p for p in players if p["type"] == player_type]
         for player_number in player_numbers:
             picked_player = target_group.pop()
-            print(f" >> Picked {picked_player['name']} as"
+            try:
+                print(f" >> Picked {picked_player['name']} as"
                   f" {PLAYER_TYPE_MAP[player_type]}. OS: "
                   f"{picked_player['overall_strength']}")
+            except Exception as e:
+                pass
             formation.append((player_number, picked_player["uid"]))
 
         subs += target_group
@@ -120,11 +125,33 @@ def prepare_formation(tactic, players):
     formation = sorted(formation, key=lambda x: int(x[0].replace("p", "")))
     # fill the subs
     # get the sub gk first
-    gk = [s for s in subs if s["type"] == PLAYER_TYPE_GOAL_KEEPER][0]
-    formation.append(("p12", gk["uid"]))
-    for i in range(13, 22):
+    gk = [s for s in subs if s["type"] == PLAYER_TYPE_GOAL_KEEPER]
+    defender_subs = [s for s in subs if s["type"] == PLAYER_TYPE_DEFENDER]
+    midfielder_subs = [s for s in subs if s["type"] == PLAYER_TYPE_MIDFIELDER]
+    attacker_subs = [s for s in subs if s["type"] == PLAYER_TYPE_ATTACKER]
+
+    sub_list = []
+    for positioned_subs in [gk, defender_subs, midfielder_subs, attacker_subs]:
+        added_sub_per_position = 0
+        for positioned_sub in positioned_subs:
+            try:
+                if added_sub_per_position > 1:
+                    continue
+                sub_list.append(positioned_sub)
+                picked_player = positioned_sub
+                print(f" >> Picked Sub {picked_player['name']} as "
+                      f"{PLAYER_TYPE_MAP[picked_player['type']]} OS: "
+                      f"{picked_player['overall_strength']}")
+                added_sub_per_position += 1
+                if picked_player["type"] == PLAYER_TYPE_GOAL_KEEPER:
+                    added_sub_per_position = 42
+            except IndexError:
+                continue
+
+    sub_list.reverse()
+    for i in range(12, 22):
         try:
-            formation.append((f"p{i}", subs.pop()["uid"]))
+            formation.append((f"p{i}", sub_list.pop()["uid"]))
         except IndexError:
             pass
 
@@ -154,6 +181,7 @@ def main():
         formation_of_us = get_formation(
             r, account["username"], next_match["match_id"]
         )
+        formation_of_us = None
         if formation_of_us and str(formation_of_us) == account["formation"]:
             print(f" > Formation is already set for this match: "
                   f"{formation_of_us}.")
