@@ -181,7 +181,6 @@ def main():
         formation_of_us = get_formation(
             r, account["username"], next_match["match_id"]
         )
-        formation_of_us = None
         if formation_of_us and str(formation_of_us) == account["formation"]:
             print(f" > Formation is already set for this match: "
                   f"{formation_of_us}.")
