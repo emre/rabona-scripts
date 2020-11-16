@@ -84,7 +84,7 @@ def get_next_match(r, username):
     return resp.get("matches", [])[0]
 
 
-def get_available_players(r, username):
+def get_available_players(r, username, selected_formation):
     players = r.team(user=username).get("players", [])
     print(f" > Found {len(players)} players.")
 
@@ -94,8 +94,18 @@ def get_available_players(r, username):
             or p["frozen"] > 0)]
 
     # sort by OS + TP
-    
-    players = sorted(players, key=lambda x: ((x["overall_strength"] * 0.65) + (x["teamplayer"] * 0.35)))
+    players_with_custom_stat = []
+    for p in players:
+        p.update({
+            "custom_stat": (p["overall_strength"] * 0.50) +
+                           (p["teamplayer"] * 0.25) +
+                           (p[selected_formation] * 0.15) +
+                           (p["speed"] * 0.05) +
+                           (p["endurance"] * 0.05)
+        })
+        players_with_custom_stat.append(p)
+
+    players = sorted(players_with_custom_stat, key=lambda x: x["custom_stat"])
     return players
 
 
@@ -185,13 +195,13 @@ def main():
         formation_of_us = get_formation(
             r, account["username"], next_match["match_id"]
         )
-        formation_of_us = None
         if formation_of_us and str(formation_of_us) == account["formation"]:
             print(f" > Formation is already set for this match: "
                   f"{formation_of_us}.")
         else:
             # we need to set formation for that
-            players = get_available_players(r, account["username"])
+            players = get_available_players(
+                r, account["username"], account["formation"])
             formation = prepare_formation(account["formation"], players)
 
             op = create_custom_json_op(
