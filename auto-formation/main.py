@@ -36,8 +36,8 @@ LOOKUP_PER_TACTIC = {
     },
     "4231": {
         PLAYER_TYPE_GOAL_KEEPER: ["p1"],
-        PLAYER_TYPE_DEFENDER: ["p5", "p4", "p3", "p2"],
-        PLAYER_TYPE_MIDFIELDER: ["p8", "p6", "p11", "p10", "p7"],
+        PLAYER_TYPE_DEFENDER: ["p5", "p4", "p3", "p2", "p6", "p8"],
+        PLAYER_TYPE_MIDFIELDER: ["p11", "p10", "p7"],
         PLAYER_TYPE_ATTACKER: ["p9"],
     },
     "442": {
@@ -93,8 +93,9 @@ def get_available_players(r, username):
             p["games_injured"] > 0 or p["games_blocked"] > 0
             or p["frozen"] > 0)]
 
-    # sort by OS
-    players = sorted(players, key=lambda x: x["overall_strength"])
+    # sort by OS + TP
+    
+    players = sorted(players, key=lambda x: ((x["overall_strength"] * 0.65) + (x["teamplayer"] * 0.35)))
     return players
 
 
@@ -111,8 +112,9 @@ def prepare_formation(tactic, players):
     for player_type, player_numbers in LOOKUP_PER_TACTIC[tactic].items():
         target_group = [p for p in players if p["type"] == player_type]
         for player_number in player_numbers:
-            picked_player = target_group.pop()
             try:
+                picked_player = target_group.pop()
+            
                 print(f" >> Picked {picked_player['name']} as"
                   f" {PLAYER_TYPE_MAP[player_type]}. OS: "
                   f"{picked_player['overall_strength']}")
@@ -139,9 +141,12 @@ def prepare_formation(tactic, players):
                     continue
                 sub_list.append(positioned_sub)
                 picked_player = positioned_sub
-                print(f" >> Picked Sub {picked_player['name']} as "
+                try:
+                    print(f" >> Picked Sub {picked_player['name']} as "
                       f"{PLAYER_TYPE_MAP[picked_player['type']]} OS: "
                       f"{picked_player['overall_strength']}")
+                except Exception as e:
+                    pass
                 added_sub_per_position += 1
                 if picked_player["type"] == PLAYER_TYPE_GOAL_KEEPER:
                     added_sub_per_position = 42
@@ -177,10 +182,10 @@ def main():
         print(f" > Opponent is @{opponent_user}.")
         if formation_of_opponent:
             print(f" > Opponent will play {formation_of_opponent}.")
-
         formation_of_us = get_formation(
             r, account["username"], next_match["match_id"]
         )
+        formation_of_us = None
         if formation_of_us and str(formation_of_us) == account["formation"]:
             print(f" > Formation is already set for this match: "
                   f"{formation_of_us}.")
@@ -196,7 +201,7 @@ def main():
                 formation,
             )
 
-            c = Client(keys=[account["posting_key"]])
+            c = Client(keys=[account["posting_key"]], nodes=["https://hived.emre.sh"])
             c.broadcast(op=op)
             print(f" >>> Formation: {account['formation']} is set"
                   f" for {account['username']}.")
