@@ -1,8 +1,8 @@
-import logging
 import json
+import logging
+
 from lighthive.client import Client
 from lighthive.datastructures import Operation
-
 from rabona_python import RabonaClient
 
 from config import ACCOUNTS
@@ -21,13 +21,17 @@ logger.addHandler(fileHandler)
 r = RabonaClient()
 
 
-def create_custom_json_op(username, pid):
+def create_custom_json_op(username, pid, heal=True):
+    if heal:
+        custom_json_type = "heal_for_RBN"
+    else:
+        custom_json_type = "unblock_for_RBN"
     train_json = json.dumps(
-         {
-             "username": username,
-             "type": "heal_for_RBN",
-             "command": {"tr_var1": pid}
-         }
+        {
+            "username": username,
+            "type": custom_json_type,
+            "command": {"tr_var1": pid}
+        }
     )
 
     train_op = Operation('custom_json', {
@@ -39,16 +43,18 @@ def create_custom_json_op(username, pid):
     return train_op
 
 
-def auto_heal(team, pk):
-
+def auto_heal_and_unblock(team, pk):
     rbn_balance = r.userinfo(user=team).get("currency")
-    logger.info("Checking \"%s\" for injured players.", team)
+    logger.info("Checking \"%s\" for injured and blocked players.", team)
     players = r.team(user=team).get("players", [])
-    injured_players = [p for p in players if int(p["games_injured"]) > 0]
+    # players[0]["games_blocked"] = 1
 
-    if not injured_players:
+    injured_players = [p for p in players if int(p["games_injured"]) > 0]
+    blocked_players = [p for p in players if int(p["games_blocked"]) > 0]
+
+    if not injured_players and not blocked_players:
         logger.info(
-            "\t\"%s\" doesnt have any injured players. Skipping.",
+            "\t\"%s\" doesnt have any injured or blocked players. Skipping.",
             team,
         )
         return
@@ -60,7 +66,6 @@ def auto_heal(team, pk):
                 "\t%s (%s) is injured for %s matches. Trying to heal." % (
                     p["name"], p["uid"], p["games_injured"]
                 ))
-
             if p["games_injured"] <= max_heal_games:
                 op = create_custom_json_op(team, p["uid"])
                 c = Client(keys=[pk, ])
@@ -73,10 +78,29 @@ def auto_heal(team, pk):
                     p["name"], p["uid"], p["games_injured"]
                 )
 
+        max_unblock_games = round(rbn_balance) / 10000
+        for p in blocked_players:
+            logger.info(
+                "\t%s (%s) is blocked for %s matches. Trying to unblock." % (
+                    p["name"], p["uid"], p["games_blocked"]
+                ))
+
+            if p["games_blocked"] <= max_unblock_games:
+                op = create_custom_json_op(team, p["uid"], heal=False)
+                c = Client(keys=[pk, ])
+                c.broadcast(op=op)
+                logger.info("\t Transaction is broadcasted. Enjoy.")
+                max_heal_games -= p["games_injured"] * 10000
+            else:
+                logger.info(
+                    "\tNot enough RBN to unblock %s (%s) for %s matches.",
+                    p["name"], p["uid"], p["games_blocked"]
+                )
+
 
 def main():
     for team in ACCOUNTS:
-        auto_heal(team["username"], team["posting_key"])
+        auto_heal_and_unblock(team["username"], team["posting_key"])
 
 
 main()
