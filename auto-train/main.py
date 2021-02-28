@@ -14,12 +14,12 @@ from datetime import datetime
 from config import ACCOUNTS
 
 
-def create_custom_json_op(username, auto_train_type):
+def create_custom_json_op(username, auto_train_type, players):
     train_json = json.dumps(
          {
              "username": username,
              "type": "train",
-             "command": {"tr_var1": auto_train_type}}
+             "command": {"tr_var1": auto_train_type, "tr_var2": players}}
     )
 
     train_op = Operation('custom_json', {
@@ -36,7 +36,6 @@ def main():
     for account in ACCOUNTS:
         # check if we can train, first.
         userinfo = r.userinfo(user=account["username"])
-        userinfo["training_possible"] = True
         if not userinfo.get("training_possible"):
             # training is not possible, wait.
             dt_delta = datetime.fromtimestamp(
@@ -47,8 +46,16 @@ def main():
                 hours_left
             ))
         else:
+            players = r.team(user=account["username"]).get("players", [])
+            print(f" > Found {len(players)} players.")
+
+            # remove the players that can't play
+            players = [p["uid"] for p in players if not (
+                    p["games_injured"] > 0 or p["games_blocked"] > 0
+                    or p["frozen"] > 0)]
+
             op = create_custom_json_op(
-                account["username"], account["auto_train_type"])
+                account["username"], account["auto_train_type"], players)
             c = Client(keys=[account["posting_key"]])
             c.broadcast(op=op)
             print("[%s] [Training: %s] Done." % (
